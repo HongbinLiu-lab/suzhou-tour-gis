@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>苏州旅游GIS系统</title>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<style>
+
+body{
+margin:0;
+font-family:"Microsoft YaHei",sans-serif;
+}
+
+#map{
+height:100vh;
+width:100%;
+}
+
+/* 标题 */
+
+.title{
+
+position:absolute;
+
+top:15px;
+left:50%;
+
+transform:translateX(-50%);
+
+background:rgba(255,255,255,0.95);
+
+padding:10px 25px;
+
+border-radius:12px;
+
+font-size:24px;
+
+font-weight:bold;
+
+z-index:1000;
+
+box-shadow:0 0 15px rgba(0,0,0,0.3);
+
+}
+
+/* 控制面板 */
+
+.panel{
+
+position:absolute;
+
+top:80px;
+right:15px;
+
+width:240px;
+
+background:rgba(255,255,255,0.95);
+
+padding:15px;
+
+border-radius:12px;
+
+z-index:1000;
+
+box-shadow:0 0 15px rgba(0,0,0,0.3);
+
+backdrop-filter:blur(5px);
+
+}
+
+.panel h2{
+
+margin-top:0;
+font-size:18px;
+text-align:center;
+
+}
+
+button{
+
+width:100%;
+
+padding:10px;
+
+margin-top:8px;
+
+border:none;
+
+border-radius:6px;
+
+background:#409EFF;
+
+color:white;
+
+font-size:14px;
+
+cursor:pointer;
+
+transition:0.3s;
+
+}
+
+button:hover{
+
+background:#66b1ff;
+
+}
+
+/* 图例 */
+
+.legend{
+
+position:absolute;
+
+bottom:20px;
+left:20px;
+
+background:white;
+
+padding:12px;
+
+border-radius:10px;
+
+z-index:1000;
+
+box-shadow:0 0 10px rgba(0,0,0,0.2);
+
+font-size:14px;
+
+}
+
+.legend div{
+margin-top:5px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="title">
+苏州旅游GIS系统
+</div>
+
+<div id="map"></div>
+
+<!-- 功能面板 -->
+<div class="panel">
+<h2>功能模块</h2>
+
+<button onclick="findNearby()">📍 附近3km景点</button>
+<button onclick="toggleHeat()">🔥 热力图分析</button>
+<button onclick="recommend()">🎯 智能旅游推荐</button>
+
+<hr>
+<b>图层控制</b><br><br>
+
+<label><input type="checkbox" value="园林" checked>园林</label><br>
+<label><input type="checkbox" value="古镇" checked>古镇</label><br>
+<label><input type="checkbox" value="景区" checked>景区</label><br>
+<label><input type="checkbox" value="博物馆" checked>博物馆</label><br>
+<label><input type="checkbox" value="书店" checked>书店</label><br>
+<label><input type="checkbox" value="步行街" checked>步行街</label>
+
+<hr>
+<b>推荐偏好</b><br><br>
+<label><input type="checkbox" id="p1" checked>园林</label><br>
+<label><input type="checkbox" id="p2" checked>古镇</label><br>
+<label><input type="checkbox" id="p3" checked>景区</label><br>
+<label><input type="checkbox" id="p4" checked>博物馆</label><br>
+<label><input type="checkbox" id="p5" checked>书店</label><br>
+<label><input type="checkbox" id="p6" checked>步行街</label><br>
+<br>
+<label>游玩天数：
+<select id="days">
+  <option value="1">1天</option>
+  <option value="2">2天</option>
+  <option value="3">3天</option>
+</select>
+</label>
+
+</div>
+
+<!-- 图例 -->
+<div class="legend">
+<b>图例</b>
+<div>🟢 园林</div>
+<div>🔵 古镇</div>
+<div>🔴 景区</div>
+<div>🟣 博物馆</div>
+<div>🟠 书店</div>
+<div>🟤 步行街</div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script>
+
+// ======================
+// 初始化地图
+// ======================
+
+var map = L.map('map').setView(
+[31.30,120.62],
+11
+);
+
+// 苏州范围限制
+map.setMaxBounds([
+[30.9,120.3],
+[31.7,121.1]
+]);
+
+// 底图
+L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{ maxZoom:18 }
+).addTo(map);
+
+// 比例尺
+L.control.scale().addTo(map);
+
+// ======================
+// 完整景点数据
+// ======================
+
+var scenicData = {
+"type":"FeatureCollection",
+"features":[
+
+// 园林
+{
+"type":"Feature",
+"properties":{
+"name":"拙政园",
+"category":"园林",
+"district":"姑苏区",
+"heat":95,
+"url":"https://baike.baidu.com/item/拙政园"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.62471,31.32626]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"留园",
+"category":"园林",
+"district":"姑苏区",
+"heat":90,
+"url":"https://baike.baidu.com/item/留园"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.587949,31.317715]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"狮子林",
+"category":"园林",
+"district":"姑苏区",
+"heat":88,
+"url":"https://baike.baidu.com/item/狮子林"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.624687,31.323386]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"网师园",
+"category":"园林",
+"district":"姑苏区",
+"heat":82,
+"url":"https://baike.baidu.com/item/网师园"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.629807,31.300468]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"沧浪亭",
+"category":"园林",
+"district":"姑苏区",
+"heat":80,
+"url":"https://baike.baidu.com/item/沧浪亭"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.621431,31.296783]
+}
+},
+
+// 景区
+{
+"type":"Feature",
+"properties":{
+"name":"虎丘",
+"category":"景区",
+"district":"姑苏区",
+"heat":94,
+"url":"https://baike.baidu.com/item/虎丘"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.57626,31.33753]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"寒山寺",
+"category":"景区",
+"district":"姑苏区",
+"heat":85,
+"url":"https://baike.baidu.com/item/寒山寺"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.564356,31.3126]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"山塘街",
+"category":"景区",
+"district":"姑苏区",
+"heat":91,
+"url":"https://baike.baidu.com/item/山塘街"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.597406,31.320061]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"平江路",
+"category":"景区",
+"district":"姑苏区",
+"heat":90,
+"url":"https://baike.baidu.com/item/平江路"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.629743,31.314965]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"盘门景区",
+"category":"景区",
+"district":"姑苏区",
+"heat":78,
+"url":"https://baike.baidu.com/item/盘门"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.613037,31.291002]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"金鸡湖",
+"category":"景区",
+"district":"工业园区",
+"heat":92,
+"url":"https://baike.baidu.com/item/金鸡湖"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.68953,31.31397]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"西园寺",
+"category":"景区",
+"district":"姑苏区",
+"heat":77,
+"url":"https://baike.baidu.com/item/西园寺"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.582943,31.317898]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"天平山",
+"category":"景区",
+"district":"吴中区",
+"heat":79,
+"url":"https://baike.baidu.com/item/天平山"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.496362,31.290301]
+}
+},
+
+// 新增Excel景区
+{
+"type":"Feature",
+"properties":{
+"name":"石湖",
+"category":"景区",
+"district":"吴中区",
+"heat":83,
+"url":"https://baike.baidu.com/item/石湖"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.59162,31.24692]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"上方山",
+"category":"景区",
+"district":"虎丘区",
+"heat":81,
+"url":"https://baike.baidu.com/item/上方山国家森林公园"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.57897,31.245675]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"独墅湖",
+"category":"景区",
+"district":"工业园区",
+"heat":82,
+"url":"https://baike.baidu.com/item/独墅湖"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.69865,31.27868]
+}
+},
+
+// 古镇
+{
+"type":"Feature",
+"properties":{
+"name":"周庄古镇",
+"category":"古镇",
+"district":"昆山市",
+"heat":93,
+"url":"https://baike.baidu.com/item/周庄"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.84718,31.11714]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"同里古镇",
+"category":"古镇",
+"district":"吴江区",
+"heat":89,
+"url":"https://baike.baidu.com/item/同里古镇"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.71742,31.15799]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"甪直古镇",
+"category":"古镇",
+"district":"吴中区",
+"heat":84,
+"url":"https://baike.baidu.com/item/甪直古镇"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.868878,31.271829]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"木渎古镇",
+"category":"古镇",
+"district":"吴中区",
+"heat":86,
+"url":"https://baike.baidu.com/item/木渎古镇"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.517799,31.259884]
+}
+},
+
+// 博物馆
+{
+"type":"Feature",
+"properties":{
+"name":"苏州博物馆",
+"category":"博物馆",
+"district":"姑苏区",
+"heat":96,
+"url":"https://baike.baidu.com/item/苏州博物馆"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.623574,31.325372]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"昆曲博物馆",
+"category":"博物馆",
+"district":"姑苏区",
+"heat":70,
+"url":"https://baike.baidu.com/item/昆曲博物馆"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.947786,31.392937]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"丝绸博物馆",
+"category":"博物馆",
+"district":"姑苏区",
+"heat":72,
+"url":"https://baike.baidu.com/item/中国丝绸博物馆"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.613851,31.325198]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"苏州博物馆西馆",
+"category":"博物馆",
+"district":"虎丘区",
+"heat":85,
+"url":"https://baike.baidu.com/item/苏州博物馆西馆"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.543521,31.29116]
+}
+},
+
+// 新增Excel书店
+{
+"type":"Feature",
+"properties":{
+"name":"诚品书店",
+"category":"书店",
+"district":"工业园区",
+"heat":84,
+"url":"https://baike.baidu.com/item/诚品书店"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.70543,31.323028]
+}
+},
+
+// 新增Excel步行街
+{
+"type":"Feature",
+"properties":{
+"name":"十全街",
+"category":"步行街",
+"district":"姑苏区",
+"heat":85,
+"url":"https://baike.baidu.com/item/十全街"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.627212,31.300935]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"葑门横街",
+"category":"步行街",
+"district":"姑苏区",
+"heat":83,
+"url":"https://baike.baidu.com/item/葑门横街"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.647469,31.301833]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"观前街",
+"category":"步行街",
+"district":"姑苏区",
+"heat":88,
+"url":"https://baike.baidu.com/item/观前街"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.620347,31.313341]
+}
+},
+
+{
+"type":"Feature",
+"properties":{
+"name":"石路",
+"category":"步行街",
+"district":"姑苏区",
+"heat":80,
+"url":"https://baike.baidu.com/item/石路（苏州石路）"
+},
+"geometry":{
+"type":"Point",
+"coordinates":[120.597389,31.313781]
+}
+}
+
+]
+};
+
+// ======================
+// 分类颜色
+// ======================
+
+function getColor(category){
+if(category=="园林") return "green";
+if(category=="古镇") return "blue";
+if(category=="景区") return "red";
+if(category=="博物馆") return "purple";
+if(category=="书店") return "orange";
+if(category=="步行街") return "brown";
+return "black";
+}
+
+// ======================
+// 加载图层
+// ======================
+
+var geoLayer;
+
+function loadData(filterTypes){
+
+if(geoLayer){
+map.removeLayer(geoLayer);
+}
+
+geoLayer=L.geoJSON(scenicData,{
+
+filter:function(feature){
+return filterTypes.includes(feature.properties.category);
+},
+
+pointToLayer:function(feature,latlng){
+return L.circleMarker(latlng,{
+radius:8,
+fillColor:getColor(feature.properties.category),
+color:"#fff",
+weight:1,
+fillOpacity:0.9
+});
+},
+
+onEachFeature:function(feature,layer){
+layer.bindPopup(
+"<b>"+feature.properties.name+"</b><br>"+
+"类型："+feature.properties.category+"<br>"+
+"区域："+feature.properties.district+"<br>"+
+"热度："+feature.properties.heat+"<br><br>"+
+"<a href='"+feature.properties.url+
+"' target='_blank'>📖 百度百科</a>"
+);
+}
+
+}).addTo(map);
+}
+
+// 初始加载
+loadData(["园林","古镇","景区","博物馆","书店","步行街"]);
+
+// ======================
+// 图层筛选
+// ======================
+
+document.querySelectorAll("input[type=checkbox]").forEach(cb=>{
+cb.onchange=()=>{
+var arr=[];
+document.querySelectorAll(".panel input[type=checkbox]").forEach(c=>{
+// 排除推荐偏好的复选框，不影响原图层控制逻辑
+if(c.value && !c.id.startsWith("p")){
+if(c.checked) arr.push(c.value);
+}
+});
+loadData(arr);
+};
+});
+
+// ======================
+// 热力图
+// ======================
+
+var heatLayer;
+var heatOn=false;
+
+function toggleHeat(){
+if(heatOn){
+map.removeLayer(heatLayer);
+heatOn=false;
+return;
+}
+
+var arr=scenicData.features.map(f=>[
+f.geometry.coordinates[1],
+f.geometry.coordinates[0],
+f.properties.heat/100
+]);
+
+heatLayer=L.heatLayer(arr,{
+radius:30,
+blur:25
+}).addTo(map);
+heatOn=true;
+}
+
+// ======================
+// 附近景点
+// ======================
+var tempLayers = [];
+
+function clearTempLayers(){
+  tempLayers.forEach(l => map.removeLayer(l));
+  tempLayers = [];
+}
+
+function searchNearbyPoint(latlng, radius){
+  clearTempLayers();
+  
+  var circle = L.circle(latlng, {
+    radius: radius,
+    color: "blue",
+    fillOpacity: 0.1
+  }).addTo(map);
+  tempLayers.push(circle);
+  
+  map.setView(latlng, 14);
+  
+  var count = 0;
+  scenicData.features.forEach(f => {
+    var p = L.latLng(f.geometry.coordinates[1], f.geometry.coordinates[0]);
+    if(latlng.distanceTo(p) <= radius){
+      count++;
+      var marker = L.marker(p)
+        .addTo(map)
+        .bindPopup(`范围内景点：${f.properties.name}`);
+      tempLayers.push(marker);
+    }
+  });
+  
+  var centerMarker = L.marker(latlng)
+    .addTo(map)
+    .bindPopup(`查询点<br>半径 ${radius/1000} km<br>景点数：${count}`)
+    .openPopup();
+  tempLayers.push(centerMarker);
+}
+
+map.on('click', function(e){
+  var r = prompt("请输入查询半径（公里）：\n3 = 3公里\n5 = 5公里", "3");
+  if(!r) return;
+  var km = parseFloat(r);
+  if(isNaN(km) || km < 1 || km >10) {
+    alert("请输入1-10之间的数字");
+    return;
+  }
+  searchNearbyPoint(e.latlng, km * 1000);
+});
+
+function findNearby(){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    var user = L.latLng(pos.coords.latitude, pos.coords.longitude);
+    searchNearbyPoint(user, 3000);
+  });
+}
+
+// ======================
+// 智能推荐（新增3条可选路线，原逻辑完全保留）
+// ======================
+var routeLayers = [];
+
+function clearRouteLayers(){
+  routeLayers.forEach(layer => map.removeLayer(layer));
+  routeLayers = [];
+}
+
+// 计算两点距离
+function getDistance(lat1,lng1,lat2,lng2){
+  let p1 = L.latLng(lat1,lng1);
+  let p2 = L.latLng(lat2,lng2);
+  return p1.distanceTo(p2);
+}
+
+// 路线1：经典热度路线（原逻辑完全保留）
+function getClassicRoute(list, total){
+  list.sort((a,b)=>b.properties.heat - a.properties.heat);
+  let candidate = list.slice(0, total + 2);
+  let sorted = [candidate[0]];
+  let rest = candidate.slice(1);
+
+  while(rest.length > 0 && sorted.length < total){
+    let last = sorted[sorted.length - 1];
+    let lastLat = last.geometry.coordinates[1];
+    let lastLng = last.geometry.coordinates[0];
+    rest.sort((x,y)=>{
+      let d1 = getDistance(lastLat,lastLng, x.geometry.coordinates[1],x.geometry.coordinates[0]);
+      let d2 = getDistance(lastLat,lastLng, y.geometry.coordinates[1],y.geometry.coordinates[0]);
+      return d1 - d2;
+    });
+    sorted.push(rest.shift());
+  }
+  return sorted.slice(0, total);
+}
+
+// 路线2：区域集中路线（优先同区域，减少跨区）
+function getAreaRoute(list, total){
+  // 按区域分组，统计每个区域的景点数
+  let areaMap = {};
+  list.forEach(item => {
+    if(!areaMap[item.properties.district]) areaMap[item.properties.district] = [];
+    areaMap[item.properties.district].push(item);
+  });
+
+  // 按区域内景点热度排序
+  for(let area in areaMap){
+    areaMap[area].sort((a,b)=>b.properties.heat - a.properties.heat);
+  }
+
+  // 优先选景点多的区域，集中安排
+  let sortedAreas = Object.keys(areaMap).sort((a,b)=>areaMap[b].length - areaMap[a].length);
+  let result = [];
+  sortedAreas.forEach(area => {
+    result = result.concat(areaMap[area]);
+  });
+
+  return result.slice(0, total);
+}
+
+// 路线3：小众深度路线（中高热度，避开顶流）
+function getNicheRoute(list, total){
+  // 筛选热度70-90的小众景点，避开90+的顶流
+  let nicheList = list.filter(item => item.properties.heat >=70 && item.properties.heat <=90);
+  if(nicheList.length < total) nicheList = list; // 数量不够就补全
+  nicheList.sort((a,b)=>b.properties.heat - a.properties.heat);
+  
+  // 就近排序
+  let candidate = nicheList.slice(0, total + 2);
+  let sorted = [candidate[0]];
+  let rest = candidate.slice(1);
+
+  while(rest.length > 0 && sorted.length < total){
+    let last = sorted[sorted.length - 1];
+    let lastLat = last.geometry.coordinates[1];
+    let lastLng = last.geometry.coordinates[0];
+    rest.sort((x,y)=>{
+      let d1 = getDistance(lastLat,lastLng, x.geometry.coordinates[1],x.geometry.coordinates[0]);
+      let d2 = getDistance(lastLat,lastLng, y.geometry.coordinates[1],y.geometry.coordinates[0]);
+      return d1 - d2;
+    });
+    sorted.push(rest.shift());
+  }
+  return sorted.slice(0, total);
+}
+
+// 主推荐函数（仅新增路线选择，原绘制逻辑完全保留）
+function recommend(){
+  clearRouteLayers();
+  clearTempLayers();
+
+  // 读取勾选偏好
+  let prefers = [];
+  if(document.getElementById("p1").checked) prefers.push("园林");
+  if(document.getElementById("p2").checked) prefers.push("古镇");
+  if(document.getElementById("p3").checked) prefers.push("景区");
+  if(document.getElementById("p4").checked) prefers.push("博物馆");
+  if(document.getElementById("p5").checked) prefers.push("书店");
+  if(document.getElementById("p6").checked) prefers.push("步行街");
+
+  if(prefers.length === 0){
+    alert("请至少选择一种偏好！");
+    return;
+  }
+
+  let days = parseInt(document.getElementById("days").value);
+  let total = days === 1 ? 4 : days === 2 ? 6 : 6;
+
+  // 筛选偏好景点
+  let list = scenicData.features.filter(f => prefers.includes(f.properties.category));
+  if(list.length === 0){
+    alert("未找到该类型景点");
+    return;
+  }
+
+  // 选择路线类型
+  let routeType = prompt(
+    "请选择推荐路线类型（输入数字）：\n1. 经典热度路线（原逻辑，首次来苏首选）\n2. 区域集中路线（少跨区，轻松出行）\n3. 小众深度路线（二刷/人少景美）",
+    "1"
+  );
+  if(!routeType) return;
+  routeType = parseInt(routeType);
+  if(isNaN(routeType) || routeType <1 || routeType>3) routeType =1;
+
+  // 生成对应路线
+  let selected;
+  let routeName;
+  switch(routeType){
+    case 1:
+      selected = getClassicRoute(list, total);
+      routeName = "经典热度路线";
+      break;
+    case 2:
+      selected = getAreaRoute(list, total);
+      routeName = "区域集中路线";
+      break;
+    case 3:
+      selected = getNicheRoute(list, total);
+      routeName = "小众深度路线";
+      break;
+  }
+
+  // 绘制路线（和你原来的逻辑完全一致，没动）
+  var points = [];
+  var info = `【${routeName}】\n偏好：${prefers.join("、")}\n天数：${days}天\n\n`;
+
+  selected.forEach((item, idx) => {
+    var p = L.latLng(
+      item.geometry.coordinates[1],
+      item.geometry.coordinates[0]
+    );
+    points.push(p);
+    var dayNum = Math.floor(idx / (total/days)) + 1;
+    info += `Day${dayNum}：${item.properties.name}（${item.properties.category}）\n`;
+    var m = L.marker(p).addTo(map).bindPopup(`Day${dayNum}：${item.properties.name}`);
+    routeLayers.push(m);
+  });
+
+  var line = L.polyline(points, { color: "red", weight: 4, opacity: 0.7 }).addTo(map);
+  routeLayers.push(line);
+  map.fitBounds(line.getBounds(), { padding: [50,50] });
+  alert(info);
+}
+
+</script>
+
+</body>
+</html>
