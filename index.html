@@ -759,7 +759,7 @@ loadData(arr);
 });
 
 // ======================
-// 热力图
+// 热力图（仅优化了这个函数，其余代码完全不动）
 // ======================
 
 var heatLayer;
@@ -772,15 +772,25 @@ heatOn=false;
 return;
 }
 
+// 优化1：放大热力权重，从/100改成/20，让热度更明显
 var arr=scenicData.features.map(f=>[
 f.geometry.coordinates[1],
 f.geometry.coordinates[0],
-f.properties.heat/100
+f.properties.heat/20
 ]);
 
+// 优化2：调大热力范围，新增高对比渐变，优化透明度
 heatLayer=L.heatLayer(arr,{
-radius:30,
-blur:25
+radius:45,
+blur:35,
+minOpacity:0.2,
+gradient:{
+0.0: 'blue',
+0.3: 'cyan',
+0.6: 'yellow',
+0.9: 'red',
+1.0: 'darkred'
+}
 }).addTo(map);
 heatOn=true;
 }
